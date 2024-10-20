@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub enum AccessType {
     Unknown,
@@ -15,7 +15,7 @@ pub enum AccessType {
 /// Each not in LruKCache has K last access history.
 /// It also has info about which frame.
 struct LruNode {
-    history: Vec<SystemTime>,
+    history: Vec<u64>,
     frame_id: usize,
     k: usize,
     evictable: bool,
@@ -35,7 +35,10 @@ impl LruNode {
         if self.history.len() >= self.k {
             self.history.pop();
         }
-        self.history.push(SystemTime::now());
+        let now = SystemTime::now();
+        let since_epoch = now.duration_since(UNIX_EPOCH).unwrap();
+        let nanos = since_epoch.as_secs() * 1_000_000_000 + since_epoch.subsec_nanos() as u64;
+        self.history.push(nanos);
     }
 }
 
@@ -63,7 +66,7 @@ impl LruKReplacer {
         self.panic_if_not_valid_frame_id(frame_id);
         let mut guard = self.node_store.lock().unwrap();
         if let Some(node) = guard.get_mut(&frame_id) {
-            node.history.push(SystemTime::now());
+            node.add_history();
             return;
         }
 
@@ -127,8 +130,8 @@ impl LruKReplacer {
     ///
     pub(super) fn evict(&self) -> Option<usize> {
         let mut guard = self.node_store.lock().unwrap();
-        let mut less_than_k: Option<(usize, SystemTime)> = None;
-        let mut k_history: Option<(usize, SystemTime)> = None;
+        let mut less_than_k: Option<(usize, u64)> = None;
+        let mut k_history: Option<(usize, u64)> = None;
         for (k, v) in guard.iter() {
             if !v.evictable {
                 continue;
