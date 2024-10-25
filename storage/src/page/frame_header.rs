@@ -53,8 +53,17 @@ impl FrameHeader {
         self.page_id
     }
 
+    // this is only to be used at time for flush. As data needs to be transferred across thread.
     pub fn get_data_mut(&mut self) -> Box<[u8; PAGE_SIZE]> {
         self.data.take().unwrap()
+    }
+
+    pub fn get_writable_data(&mut self) -> &mut [u8; PAGE_SIZE] {
+        self.data.as_deref_mut().unwrap()
+    }
+
+    pub fn get_readable_data(&self) -> &[u8; PAGE_SIZE] {
+        self.data.as_deref().unwrap()
     }
 
     pub fn set_data(&mut self, data: BoxedData) {

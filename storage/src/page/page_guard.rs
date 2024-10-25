@@ -9,12 +9,12 @@ type DexTxSender = Sender<(usize, oneshot::Sender<()>)>;
 
 pub struct ReadPageGuard {
     lock: Arc<RwLock<FrameHeader>>,
-    read_guard: RwLockReadGuard<'static, FrameHeader>,
+    read_guard: Option<RwLockReadGuard<'static, FrameHeader>>,
     dec_tx: DexTxSender,
 }
 pub struct WritePageGuard {
     lock: Arc<RwLock<FrameHeader>>,
-    pub write_guard: RwLockWriteGuard<'static, FrameHeader>,
+    write_guard: Option<RwLockWriteGuard<'static, FrameHeader>>,
     dec_tx: DexTxSender,
 }
 
@@ -27,8 +27,20 @@ pub fn read_page_guard(lock: Arc<RwLock<FrameHeader>>, dec_tx: DexTxSender) -> R
     read_guard.incr_pin_count();
     ReadPageGuard {
         lock,
-        read_guard,
+        read_guard: Some(read_guard),
         dec_tx,
+    }
+}
+
+impl WritePageGuard {
+    pub fn get_write_guard(&mut self) -> &mut RwLockWriteGuard<'static, FrameHeader> {
+        self.write_guard.as_mut().unwrap()
+    }
+}
+
+impl ReadPageGuard {
+    pub fn get_read_guard(&self) -> &RwLockReadGuard<'static, FrameHeader> {
+        self.read_guard.as_ref().unwrap()
     }
 }
 
@@ -43,25 +55,33 @@ pub fn write_page_guard(lock: Arc<RwLock<FrameHeader>>, dec_tx: DexTxSender) -> 
     write_guard.set_dirty(true);
     WritePageGuard {
         lock,
-        write_guard,
+        write_guard: Some(write_guard),
         dec_tx,
     }
 }
 
 impl Drop for ReadPageGuard {
     fn drop(&mut self) {
-        self.read_guard.decr_pin_count();
+        let read_guard = self.read_guard.take().unwrap();
+        read_guard.decr_pin_count();
         let (tx, rx) = oneshot::channel();
-        self.dec_tx.send((self.read_guard.frame_id(), tx)).unwrap();
+        self.dec_tx.send((read_guard.frame_id(), tx)).unwrap();
+        // dropping this guard is important. Otherwise say a write thread for same frame,
+        // holding bpm lock, will be held. And dec_tx also needs that lock.
+        drop(read_guard);
         rx.blocking_recv().unwrap();
     }
 }
 
 impl Drop for WritePageGuard {
     fn drop(&mut self) {
-        self.write_guard.decr_pin_count();
+        let write_guard = self.write_guard.take().unwrap();
+        write_guard.decr_pin_count();
         let (tx, rx) = oneshot::channel();
-        self.dec_tx.send((self.write_guard.frame_id(), tx)).unwrap();
+        self.dec_tx.send((write_guard.frame_id(), tx)).unwrap();
+        // dropping this guard is important. Otherwise say a reader thread for same frame,
+        // holding bpm lock, will be held. And dec_tx also needs that lock.
+        drop(write_guard);
         rx.blocking_recv().unwrap();
     }
 }
