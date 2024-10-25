@@ -1,13 +1,13 @@
+#![allow(dead_code)]
 use std::{
     fs::{File, OpenOptions},
     io::{self, Read, Seek, SeekFrom, Write},
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    path::PathBuf,
 };
 
-use crate::PAGE_SIZE;
+use crate::{PageOperator, PAGE_SIZE};
 
-pub(super) struct DiskManager {
+pub(crate) struct DiskManager {
     db_path: PathBuf,
     db_file: File,
 }
@@ -21,8 +21,10 @@ impl DiskManager {
             db_file: file,
         })
     }
+}
 
-    pub(super) fn write_page(&mut self, page_id: usize, data: &[u8; PAGE_SIZE]) -> io::Result<()> {
+impl PageOperator for DiskManager {
+    fn write_page(&mut self, page_id: usize, data: &[u8; PAGE_SIZE]) -> io::Result<()> {
         let beginning_offset = page_id * PAGE_SIZE;
         self.db_file
             .seek(SeekFrom::Start(beginning_offset as u64))?;
@@ -32,11 +34,7 @@ impl DiskManager {
         Ok(())
     }
 
-    pub(super) fn read_page(
-        &mut self,
-        page_id: usize,
-        data: &mut [u8; PAGE_SIZE],
-    ) -> io::Result<()> {
+    fn read_page(&mut self, page_id: usize, data: &mut [u8; PAGE_SIZE]) -> io::Result<()> {
         let beginning_offset = page_id * PAGE_SIZE;
         self.db_file
             .seek(SeekFrom::Start(beginning_offset as u64))?;

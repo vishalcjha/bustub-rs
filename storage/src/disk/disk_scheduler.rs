@@ -1,10 +1,13 @@
+#![allow(dead_code)]
 use std::{
     io,
     sync::mpsc::{channel, Sender},
     thread::{self, JoinHandle},
 };
 
-use crate::{disk_manager::DiskManager, disk_request::DiskRequest};
+use crate::PageOperator;
+
+use super::disk_request::DiskRequest;
 
 pub struct DiskScheduler {
     request_handler: JoinHandle<()>,
@@ -12,8 +15,9 @@ pub struct DiskScheduler {
 }
 
 impl DiskScheduler {
-    fn new(db_path: &str) -> DiskScheduler {
-        let mut disk_manager = DiskManager::new(db_path).expect("Disk manager creation failed");
+    pub fn new(_db_path: &str, page_operator: Box<dyn PageOperator>) -> DiskScheduler {
+        let mut page_operator = page_operator;
+        //let mut disk_manager = DiskManager::new(db_path).expect("Disk manager creation failed");
         let (tx, rx) = channel::<DiskRequest>();
         let request_handler = thread::spawn(move || {
             while let Ok(request) = rx.recv() {
@@ -23,16 +27,17 @@ impl DiskScheduler {
                         data_buf,
                         ack,
                     } => {
-                        let res = disk_manager.read_page(page_id, data_buf);
-                        let _ = ack.send(res);
+                        let mut data_buf = data_buf;
+                        let res = page_operator.read_page(page_id, &mut data_buf);
+                        let _ = ack.send(res.map(|_| data_buf));
                     }
                     DiskRequest::Write {
                         page_id,
                         data_buf,
                         ack,
                     } => {
-                        let res = disk_manager.write_page(page_id, data_buf);
-                        let _ = ack.send(res);
+                        let res = page_operator.write_page(page_id, &data_buf);
+                        let _ = ack.send(res.map(|_| data_buf));
                     }
                 }
             }
@@ -46,7 +51,7 @@ impl DiskScheduler {
 }
 
 impl DiskScheduler {
-    pub(crate) fn schedule(&self, disk_request: DiskRequest) -> io::Result<()> {
+    pub fn schedule(&self, disk_request: DiskRequest) -> io::Result<()> {
         self.request_submitter.send(disk_request).map_err(|_| {
             io::Error::new(io::ErrorKind::NotConnected, "Failed to submit disk request")
         })?;

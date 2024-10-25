@@ -1,28 +1,29 @@
+#![allow(dead_code)]
 use std::io;
 
 use tokio::sync::oneshot;
 
 use crate::PAGE_SIZE;
-
+type BoxedData = Box<[u8; PAGE_SIZE]>;
 #[derive(Debug)]
 pub enum DiskRequest {
     Read {
         page_id: usize,
-        data_buf: &'static mut [u8; PAGE_SIZE],
-        ack: tokio::sync::oneshot::Sender<io::Result<()>>,
+        data_buf: BoxedData,
+        ack: tokio::sync::oneshot::Sender<io::Result<BoxedData>>,
     },
     Write {
         page_id: usize,
-        data_buf: &'static [u8; PAGE_SIZE],
-        ack: tokio::sync::oneshot::Sender<io::Result<()>>,
+        data_buf: BoxedData,
+        ack: tokio::sync::oneshot::Sender<io::Result<BoxedData>>,
     },
 }
 
 impl DiskRequest {
     pub fn new_read(
         page_id: usize,
-        data_buf: &'static mut [u8; PAGE_SIZE],
-    ) -> (DiskRequest, oneshot::Receiver<io::Result<()>>) {
+        data_buf: BoxedData,
+    ) -> (DiskRequest, oneshot::Receiver<io::Result<BoxedData>>) {
         let (tx, rx) = oneshot::channel();
         (
             DiskRequest::Read {
@@ -36,8 +37,8 @@ impl DiskRequest {
 
     pub fn new_write(
         page_id: usize,
-        data_buf: &'static [u8; PAGE_SIZE],
-    ) -> (DiskRequest, oneshot::Receiver<io::Result<()>>) {
+        data_buf: BoxedData,
+    ) -> (DiskRequest, oneshot::Receiver<io::Result<BoxedData>>) {
         let (tx, rx) = oneshot::channel();
 
         (
