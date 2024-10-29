@@ -6,3 +6,4 @@ mod test_helper;
 
 type TableOid = u32;
 pub use column::*;
+pub use test_helper::*;

@@ -5,4 +5,7 @@ edition = "2021"
 
 [dependencies]
 storage = {path = "../storage"}
+catalog = {path = "../catalog"}
+common = {path = "../common"}
+
 tokio = { version = "1.41.0", features = ["full"] }

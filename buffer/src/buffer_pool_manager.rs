@@ -27,7 +27,7 @@ struct Protected {
     replacer: LruKReplacer,
     written_pages: HashSet<usize>,
 }
-struct BufferPoolManager {
+pub struct BufferPoolManager {
     num_frames: usize,
     disk_scheduler: DiskScheduler,
     next_page_id: AtomicUsize,
@@ -37,7 +37,7 @@ struct BufferPoolManager {
 }
 
 impl BufferPoolManager {
-    fn new(num_frames: usize, k_dist: usize, page_operator: Box<dyn PageOperator>) -> Self {
+    pub fn new(num_frames: usize, k_dist: usize, page_operator: Box<dyn PageOperator>) -> Self {
         let disk_scheduler = DiskScheduler::new("my_db", page_operator);
         let frame_pin_count = (0..num_frames).map(|i| (i, AtomicU16::default())).collect();
         let frames = (0..num_frames)
@@ -81,12 +81,12 @@ impl BufferPoolManager {
         }
     }
 
-    fn new_page_id(&self) -> usize {
+    pub fn new_page_id(&self) -> usize {
         self.next_page_id.fetch_add(1, Ordering::SeqCst)
     }
 
     // return none if there is not evitable frame.
-    fn read_page(&self, page_id: usize) -> Option<storage::ReadPageGuard> {
+    pub fn read_page(&self, page_id: usize) -> Option<storage::ReadPageGuard> {
         let mut protected = self.protected.lock().unwrap();
         let Some(frame_id) = self.get_frame_id(protected.deref_mut(), page_id) else {
             return None;
@@ -102,7 +102,7 @@ impl BufferPoolManager {
     }
 
     // return none if there is not evitable frame.
-    fn write_page(&self, page_id: usize) -> Option<storage::WritePageGuard> {
+    pub fn write_page(&self, page_id: usize) -> Option<storage::WritePageGuard> {
         let mut protected = self.protected.lock().unwrap();
         let Some(frame_id) = self.get_frame_id(protected.deref_mut(), page_id) else {
             return None;
@@ -194,7 +194,7 @@ impl BufferPoolManager {
     /// pages on disk used to occupy should somehow be made available to new pages allocated by `NewPage`. But for later.
     ///
     /// `false` if the page exists but could not be deleted, `true` if the page didn't exist or deletion succeeded.
-    fn delete_page(&self, page_id: usize) -> bool {
+    pub fn delete_page(&self, page_id: usize) -> bool {
         let mut protected = self.protected.lock().unwrap();
 
         let Some(&frame_id) = protected.page_table.get(&page_id) else {
@@ -252,7 +252,7 @@ mod test {
         // Check `WritePageGuard` basic functionality.
         {
             let mut guard = bpm.write_page(pid).unwrap();
-            let data = guard.get_write_guard().get_writable_data();
+            let data = guard.get_write_guard().get_writeable_data();
 
             data[..hello_world.len()].copy_from_slice(hello_world.as_bytes());
         }
@@ -291,12 +291,12 @@ mod test {
         {
             page_id_0 = bpm.new_page_id();
             let mut page_0_guard = bpm.write_page(page_id_0).unwrap();
-            let data = page_0_guard.get_write_guard().get_writable_data();
+            let data = page_0_guard.get_write_guard().get_writeable_data();
             data[..page_0_data.len()].copy_from_slice(page_0_data.as_bytes());
 
             page_id_1 = bpm.new_page_id();
             let mut page_1_guard = bpm.write_page(page_id_1).unwrap();
-            let data = page_1_guard.get_write_guard().get_writable_data();
+            let data = page_1_guard.get_write_guard().get_writeable_data();
             data[..page_1_data.len()].copy_from_slice(page_1_data.as_bytes());
 
             assert_eq!(1, bpm.get_pin_count(page_id_0).unwrap());
@@ -331,12 +331,12 @@ mod test {
 
         {
             let mut page_0_guard = bpm.write_page(page_id_0).unwrap();
-            let data = page_0_guard.get_write_guard().get_writable_data();
+            let data = page_0_guard.get_write_guard().get_writeable_data();
             assert_eq!(true, data[..page_0_data.len()].eq(page_0_data.as_bytes()));
             data[..page_0_updated.len()].copy_from_slice(page_0_updated.as_bytes());
 
             let mut page_1_guard = bpm.write_page(page_id_1).unwrap();
-            let data = page_1_guard.get_write_guard().get_writable_data();
+            let data = page_1_guard.get_write_guard().get_writeable_data();
             assert_eq!(true, data[..page_1_data.len()].eq(page_1_data.as_bytes()));
             data[..page_1_updated.len()].copy_from_slice(page_1_updated.as_bytes());
 
@@ -378,7 +378,7 @@ mod test {
         let hello = "Hello";
         let page_0 = bpm.new_page_id();
         let mut page_0_guard = bpm.write_page(page_0).unwrap();
-        let data = page_0_guard.get_write_guard().get_writable_data();
+        let data = page_0_guard.get_write_guard().get_writeable_data();
         data[..hello.len()].copy_from_slice(hello.as_bytes());
         drop(page_0_guard);
 
@@ -467,7 +467,7 @@ mod test {
                     thread::sleep(Duration::from_millis(5));
                     let mut guard = bpm.write_page(pid).unwrap();
                     let to_write = i.to_string();
-                    let data = guard.get_write_guard().get_writable_data();
+                    let data = guard.get_write_guard().get_writeable_data();
                     data[..to_write.len()].copy_from_slice(to_write.as_bytes());
                 }
             });

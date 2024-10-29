@@ -1,0 +1,12 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+
+[[test]]
+name = "b_plus_tree_insert_test"
+
+[dependencies]
+catalog = {path = "../catalog"}
+storage = {path = "../storage"}
+buffer = {path = "../buffer"}

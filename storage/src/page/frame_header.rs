@@ -2,6 +2,7 @@
 use std::sync::atomic::{AtomicU16, Ordering};
 
 use crate::PAGE_SIZE;
+
 type BoxedData = Box<[u8; PAGE_SIZE]>;
 
 pub struct FrameHeader {
@@ -58,12 +59,20 @@ impl FrameHeader {
         self.data.take().unwrap()
     }
 
-    pub fn get_writable_data(&mut self) -> &mut [u8; PAGE_SIZE] {
+    pub fn get_writeable_data(&mut self) -> &mut [u8; PAGE_SIZE] {
         self.data.as_deref_mut().unwrap()
+    }
+
+    pub fn get_writeable_data_as<T>(&mut self) -> &mut T {
+        todo!()
     }
 
     pub fn get_readable_data(&self) -> &[u8; PAGE_SIZE] {
         self.data.as_deref().unwrap()
+    }
+
+    pub fn get_readable_data_as<T>(&self) -> &T {
+        todo!()
     }
 
     pub fn set_data(&mut self, data: BoxedData) {

@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.40.0", features = ["full"] }
+catalog = {path = "../catalog"}
+serde = "1.0.213"

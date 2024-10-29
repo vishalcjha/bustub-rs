@@ -3,7 +3,7 @@ use std::sync::{mpsc::Sender, Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use tokio::sync::oneshot;
 
-use crate::FrameHeader;
+use crate::page::FrameHeader;
 
 type DexTxSender = Sender<(usize, oneshot::Sender<()>)>;
 
